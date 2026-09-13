@@ -1,12 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import joblib
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
+import time
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -28,16 +29,44 @@ FEATURES = [
 def home():
     return {"message": "Grapevine Symptom Detection API is running"}
 
+
 @app.post("/predict")
-def predict(data: dict):
+def predict(data: dict, request: Request):
+    start_time = time.perf_counter()
+
+    client_ip = request.headers.get(
+    "x-forwarded-for",
+    request.client.host
+    ).split(",")[0].strip()
+    user_agent = request.headers.get("user-agent", "Unknown")
 
     X = pd.DataFrame([data], columns=FEATURES)
 
     prediction = model.predict(X)[0]
     probabilities = model.predict_proba(X)[0]
 
+    result = "symptomatic" if prediction == 1 else "healthy"
+    healthy_probability = float(probabilities[0])
+    symptomatic_probability = float(probabilities[1])
+
+    processing_time = (time.perf_counter() - start_time) * 1000
+
+    print(
+        f"\n"
+        f"========== PREDICTION ==========\n"
+        f"IP: {client_ip}\n"
+        f"User-Agent: {user_agent}\n"
+        f"Spectral values: {len(data)}\n"
+        f"Result: {result}\n"
+        f"Healthy: {healthy_probability:.2%}\n"
+        f"Symptomatic: {symptomatic_probability:.2%}\n"
+        f"Processing time: {processing_time:.2f} ms\n"
+        f"=================================\n"
+    )
+
     return {
-        "prediction": "symptomatic" if prediction == 1 else "healthy",
-        "healthy_probability": float(probabilities[0]),
-        "symptomatic_probability": float(probabilities[1])
+        "prediction": result,
+        "healthy_probability": healthy_probability,
+        "symptomatic_probability": symptomatic_probability
     }
+   
