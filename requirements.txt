@@ -1,0 +1,5 @@
+fastapi
+pandas 
+uvicron
+scikit-learn version =1.6.1
+joblib
